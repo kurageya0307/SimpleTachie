@@ -3,13 +3,13 @@
 // KURAGE_SimpleTachie.js
 // 作成者     : KURAGE
 // 作成日     : 2018/04/29
-// 最終更新日 : 2018/04/29
-// バージョン : v1.0.0
+// 最終更新日 : 2018/12/21
+// バージョン : v1.1.0
 //=============================================================================
 
 //=============================================================================
 /*:
- * @plugindesc v1.0.0 シンプルな立ち絵と名前ウィンドウを表示します。
+ * @plugindesc v1.1.0 シンプルな立ち絵と名前ウィンドウを表示します。
  * @author KURAGE
  *
  * @param --- ピクチャ関係基本設定 ---
@@ -51,98 +51,30 @@
  * @desc 立ち絵のアウトの時間（フレーム単位）
  * @default 30
  *
- * @param --- キャラクター名 ---
- * @desc コメント文
- *
- * @param CharacterName_01
- * @desc "立ち絵01"のキャラ名を設定
- *
- * @param CharacterName_02
- * @desc "立ち絵02"のキャラ名を設定
- *
- * @param CharacterName_03
- * @desc "立ち絵03"のキャラ名を設定
- *
- * @param CharacterName_04
- * @desc "立ち絵04"のキャラ名を設定
- *
- * @param CharacterName_05
- * @desc "立ち絵05"のキャラ名を設定
- *
- * @param CharacterName_06
- * @desc "立ち絵06"のキャラ名を設定
- *
- * @param CharacterName_07
- * @desc "立ち絵07"のキャラ名を設定
- *
- * @param CharacterName_08
- * @desc "立ち絵08"のキャラ名を設定
- *
- * @param CharacterName_09
- * @desc "立ち絵09"のキャラ名を設定
- *
- * @param CharacterName_10
- * @desc "立ち絵10"のキャラ名を設定
- *
- * @param CharacterName_11
- * @desc "立ち絵11"のキャラ名を設定
- *
- * @param CharacterName_12
- * @desc "立ち絵12"のキャラ名を設定
- *
- * @param CharacterName_13
- * @desc "立ち絵13"のキャラ名を設定
- *
- * @param CharacterName_14
- * @desc "立ち絵14"のキャラ名を設定
- *
- * @param CharacterName_15
- * @desc "立ち絵15"のキャラ名を設定
- *
- * @param CharacterName_16
- * @desc "立ち絵16"のキャラ名を設定
- *
- * @param CharacterName_17
- * @desc "立ち絵17"のキャラ名を設定
- *
- * @param CharacterName_18
- * @desc "立ち絵18"のキャラ名を設定
- *
- * @param CharacterName_19
- * @desc "立ち絵19"のキャラ名を設定
- *
- * @param CharacterName_20
- * @desc "立ち絵20"のキャラ名を設定
- *
  * @help 
  *
  *-----------------------------------------------------------------------------
  * 概要
  *-----------------------------------------------------------------------------
  * 立ち絵と名前ウィンドウを表示します。
- * あまり高度な使い方ができませんが，
+ * あまり高度な使い方はできませんが，
  * シンプルで簡単に立ち絵表示が可能です。
  * 
  *-----------------------------------------------------------------------------
  * 使用方法
  *-----------------------------------------------------------------------------
- * ○事前準備
- * ・プラグインパラメータの設定
- * 　プラグインパラメータの「CharacterName_XX」にキャラ名を設定します。
- *
- * ・画像の用意
- * 　img/picturesのフォルダ内に「CharacterName_XX」で設定したキャラ名と
- * 　同じ名前の画像を用意します。
- * 　例えば，CharacterName_00に「ハロルド」と登録した場合，
- * 　「ハロルド.png」をimg/picturesのフォルダ内に用意します。
- *
  * ○立ち絵の表示
- * 　イベントコマンド「文章の表示」にて文章の先頭に「\tl<キャラ名>」と入力してください。
- * 　すると，立ち絵画像と名前のウィンドウが画面左に表示されます。
+ * 　イベントコマンド「文章の表示」にて文章の先頭に「\TL<キャラ名,ファイル名>」と入力してください。
+ * 　すると，ファイル名の立ち絵画像とキャラ名が画面左に表示されます。
  * 
- * 　また，「\tr<キャラ名>」と入力した場合，立ち絵と名前のウィンドウが
+ * 　例：\TL<ハロルド,Halord>こんにちは
+ * 
+ * 　また，「\TR<キャラ名,ファイル名>」と入力した場合，立ち絵と名前のウィンドウが
  * 　画面右に表示されます。
- * 　（tlおよびtrはそれぞれ，Tachie Left, Tachie Rightの略です。）
+ * 　（TLおよびTRはそれぞれ，Tachie Left, Tachie Rightの略です。）
+ * 
+ * 　「\TL<キャラ名>」あるいは「\TR<キャラ名>」という風にファイル名を省略すると
+ * 　キャラ名ウィンドウのみ表示されます。
  * 
  * ○立ち絵の消去
  * 　プラグインコマンドで「KST アウト」と入力することで
@@ -167,6 +99,7 @@
  *-----------------------------------------------------------------------------
  * 
  * v1.0.0 - 2018/04/29 : 初版作成
+ * v1.1.0 - 2018/12/21 : 画像ファイルを指定するように変更
  * 
  *-----------------------------------------------------------------------------
 */
@@ -362,12 +295,20 @@ KURAGE.SimpleTachie = {};
     };
     
     Window_Message.prototype.convertNameBox = function(text) {
+        text = text.replace(/\x1bTL\<(.*?),(.*)\>/gi, function() {
+            $.showTachie(arguments[2], true);
+            return $.nameWindow.refresh(arguments[1], 1);
+        }, this);
+        text = text.replace(/\x1bTR\<(.*?),(.*)\>/gi, function() {
+            $.showTachie(arguments[2], false);
+            return $.nameWindow.refresh(arguments[1], 5);
+        }, this);
         text = text.replace(/\x1bTL\<(.*?)\>/gi, function() {
-            $.showTachie(arguments[1], true);
+            $.showTachie(null, true);
             return $.nameWindow.refresh(arguments[1], 1);
         }, this);
         text = text.replace(/\x1bTR\<(.*?)\>/gi, function() {
-            $.showTachie(arguments[1], false);
+            $.showTachie(null, false);
             return $.nameWindow.refresh(arguments[1], 5);
         }, this);
         return text;
@@ -377,13 +318,11 @@ KURAGE.SimpleTachie = {};
     // Global functions
     //=============================================================================
     $.showTachie = function(name, show_in_left) {
-        if($.character_names.indexOf(name)===-1){
+         if(name===null){
             $.focusOff();
             return;
         }
-
-        var char_name = $.character_names[ $.character_names.indexOf(name) ];
-        var ori_x, ori_y, target_x, target_y;
+       var ori_x, ori_y, target_x, target_y;
         if(show_in_left) {
             $.focusLeft();
             if($.The_last_left_man===name) {
@@ -394,7 +333,7 @@ KURAGE.SimpleTachie = {};
             target_x = $.left_man_adjust_x;
             target_y = $.left_man_adjust_y;
 
-            $gameScreen.showPicture($.left_man_picture_id, char_name, 0, ori_x, ori_y, 100, 100, 0, 0);
+            $gameScreen.showPicture($.left_man_picture_id, name, 0, ori_x, ori_y, 100, 100, 0, 0);
             $gameScreen.movePicture($.left_man_picture_id, 0, target_x, target_y, 100, 100, 255, 0, $.in_duration);
 
             $.The_last_left_man = name;
@@ -408,7 +347,7 @@ KURAGE.SimpleTachie = {};
             target_x = Graphics.width + $.right_man_adjust_x;
             target_y = $.right_man_adjust_y;
 
-            $gameScreen.showPicture($.right_man_picture_id, char_name, 0, ori_x, ori_y, -100, 100, 0, 0);
+            $gameScreen.showPicture($.right_man_picture_id, name, 0, ori_x, ori_y, -100, 100, 0, 0);
             $gameScreen.movePicture($.right_man_picture_id, 0, target_x, target_y, -100, 100, 255, 0, $.in_duration);
 
             $.The_last_right_man = name;
