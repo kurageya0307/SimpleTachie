@@ -3,13 +3,13 @@
 // KURAGE_SimpleTachie.js
 // 作成者     : KURAGE
 // 作成日     : 2018/04/29
-// 最終更新日 : 2018/12/21
-// バージョン : v1.1.0
+// 最終更新日 : 2020/03/04
+// バージョン : v1.2.0
 //=============================================================================
 
 //=============================================================================
 /*:
- * @plugindesc v1.1.0 シンプルな立ち絵と名前ウィンドウを表示します。
+ * @plugindesc v1.2.0 シンプルな立ち絵と名前ウィンドウを表示します。
  * @author KURAGE
  *
  * @param --- ピクチャ関係基本設定 ---
@@ -51,6 +51,10 @@
  * @desc 立ち絵のアウトの時間（フレーム単位）
  * @default 30
  *
+ * @param SlideInOutOffSwitch
+ * @desc 立ち絵のスライドイン・アウトを制御するスイッチ
+ * @default 1
+ *
  * @help 
  *
  *-----------------------------------------------------------------------------
@@ -69,6 +73,10 @@
  * 
  * 　例：\TL<ハロルド,Halord>こんにちは
  * 
+ * 　立ち絵画像imgフォルダのpicturesフォルダに保存してください。
+ * 　ファイル名の指定は拡張子を省略して入力してください。
+ * 　上記例の場合，img\picturesにHalord.pngが用意されている前提です。
+ *
  * 　また，「\TR<キャラ名,ファイル名>」と入力した場合，立ち絵と名前のウィンドウが
  * 　画面右に表示されます。
  * 　（TLおよびTRはそれぞれ，Tachie Left, Tachie Rightの略です。）
@@ -100,6 +108,7 @@
  * 
  * v1.0.0 - 2018/04/29 : 初版作成
  * v1.1.0 - 2018/12/21 : 画像ファイルを指定するように変更
+ * v1.2.0 - 2020/03/04 : プラグインで指定したスイッチがONのときスライドイン・アウトを行わないよう修正
  * 
  *-----------------------------------------------------------------------------
 */
@@ -108,7 +117,7 @@
 "use strict";
 
 var Imported = Imported || {};
-Imported["KURAGE_SimpleTachie"] = "1.0.1";
+Imported["KURAGE_SimpleTachie"] = "1.2.0";
 
 var KURAGE = KURAGE || {};
 KURAGE.SimpleTachie = {};
@@ -119,11 +128,6 @@ KURAGE.SimpleTachie = {};
     //-----------------------------------------------------------------------------
     // Plugin global variables
     //
-    $.character_names = [];
-    for(var i=1; i<21; i++) {
-        var key = "CharacterName_" + String(("0"+i).slice(-2));
-        $.character_names.push($.params[key]);
-    }
     $.left_man_picture_id  = Number($.params["LeftManPictureId"]);
     $.left_man_adjust_x    = Number($.params["LeftManAdjustX"]);
     $.left_man_adjust_y    = Number($.params["LeftManAdjustY"]);
@@ -133,12 +137,15 @@ KURAGE.SimpleTachie = {};
     $.delta_x              = Number($.params["DeltaX"]);
     $.in_duration          = Number($.params["InDuration"]);
     $.out_duration         = Number($.params["OutDuration"]);
+    $.slide_in_out_off_idx = Number($.params["SlideInOutOffSwitch"]);
 
     //-----------------------------------------------------------------------------
     // Global variables
     //
-    $.The_last_left_man  = "";
-    $.The_last_right_man = "";
+    $.Last_left_file_name  = "";
+    $.Last_right_file_name = "";
+    $.Last_left_character_name  = "";
+    $.Last_right_character_name = "";
     $.Left_man_exists  = false;
     $.Right_man_exists = false;
 
@@ -239,11 +246,9 @@ KURAGE.SimpleTachie = {};
     Window_Name_Box.prototype.adjustPositionX = function() {
         if (this._position === 1) {
           this.x = this._parentWindow.x;
-          //this.x += eval($.MSGNameBoxBufferX);
         } else {
           this.x = this._parentWindow.x + this._parentWindow.width;
           this.x -= this.width;
-          //this.x -= eval($.MSGNameBoxBufferX);
         }
         this.x = this.x.clamp(0, Graphics.boxWidth - this.width);
     };
@@ -251,15 +256,12 @@ KURAGE.SimpleTachie = {};
     Window_Name_Box.prototype.adjustPositionY = function() {
         if ($gameMessage.positionType() === 0) {
           this.y = this._parentWindow.y + this._parentWindow.height;
-          //this.y -= eval($.MSGNameBoxBufferY);
         } else {
           this.y = this._parentWindow.y;
           this.y -= this.height;
-          //this.y += eval($.MSGNameBoxBufferY);
         }
         if (this.y < 0) {
           this.y = this._parentWindow.y + this._parentWindow.height;
-          //this.y -= eval($.MSGNameBoxBufferY);
         }
     };
     
@@ -296,19 +298,19 @@ KURAGE.SimpleTachie = {};
     
     Window_Message.prototype.convertNameBox = function(text) {
         text = text.replace(/\x1bTL\<(.*?),(.*)\>/gi, function() {
-            $.showTachie(arguments[2], true);
+            $.showTachie(arguments[1], arguments[2], true);
             return $.nameWindow.refresh(arguments[1], 1);
         }, this);
         text = text.replace(/\x1bTR\<(.*?),(.*)\>/gi, function() {
-            $.showTachie(arguments[2], false);
+            $.showTachie(arguments[1], arguments[2], false);
             return $.nameWindow.refresh(arguments[1], 5);
         }, this);
         text = text.replace(/\x1bTL\<(.*?)\>/gi, function() {
-            $.showTachie(null, true);
+            $.showTachie(null, null, true);
             return $.nameWindow.refresh(arguments[1], 1);
         }, this);
         text = text.replace(/\x1bTR\<(.*?)\>/gi, function() {
-            $.showTachie(null, false);
+            $.showTachie(null, null, false);
             return $.nameWindow.refresh(arguments[1], 5);
         }, this);
         return text;
@@ -317,15 +319,16 @@ KURAGE.SimpleTachie = {};
     //=============================================================================
     // Global functions
     //=============================================================================
-    $.showTachie = function(name, show_in_left) {
-         if(name===null){
+    $.showTachie = function(character_name, file_name, show_in_left) {
+        var slide_in_out_off     = $gameSwitches.value( $.slide_in_out_off_idx );
+        if(file_name===null){
             $.focusOff();
             return;
         }
-       var ori_x, ori_y, target_x, target_y;
+        var ori_x, ori_y, target_x, target_y;
         if(show_in_left) {
             $.focusLeft();
-            if($.The_last_left_man===name) {
+            if($.Last_left_file_name===file_name) {
                 return;
             }
             ori_x    = -1 * $.delta_x + $.left_man_adjust_x;
@@ -333,13 +336,18 @@ KURAGE.SimpleTachie = {};
             target_x = $.left_man_adjust_x;
             target_y = $.left_man_adjust_y;
 
-            $gameScreen.showPicture($.left_man_picture_id, name, 0, ori_x, ori_y, 100, 100, 0, 0);
-            $gameScreen.movePicture($.left_man_picture_id, 0, target_x, target_y, 100, 100, 255, 0, $.in_duration);
+            if(slide_in_out_off && $.Last_left_character_name===character_name){
+              $gameScreen.showPicture($.left_man_picture_id, file_name, 0, target_x, target_y, 100, 100, 255, 0);
+            }else{
+              $gameScreen.showPicture($.left_man_picture_id, file_name, 0, ori_x, ori_y, 100, 100, 0, 0);
+              $gameScreen.movePicture($.left_man_picture_id, 0, target_x, target_y, 100, 100, 255, 0, $.in_duration);
+            }
 
-            $.The_last_left_man = name;
+            $.Last_left_file_name = file_name;
+            $.Last_left_character_name = character_name;
         }else{
             $.focusRight();
-            if($.The_last_right_man===name) {
+            if($.Last_right_file_name===file_name) {
                 return;
             }
             ori_x    = $.delta_x + Graphics.width + $.right_man_adjust_x;
@@ -347,10 +355,15 @@ KURAGE.SimpleTachie = {};
             target_x = Graphics.width + $.right_man_adjust_x;
             target_y = $.right_man_adjust_y;
 
-            $gameScreen.showPicture($.right_man_picture_id, name, 0, ori_x, ori_y, -100, 100, 0, 0);
-            $gameScreen.movePicture($.right_man_picture_id, 0, target_x, target_y, -100, 100, 255, 0, $.in_duration);
+            if(slide_in_out_off && $.Last_right_character_name===character_name){
+              $gameScreen.showPicture($.right_man_picture_id, file_name, 0, target_x, target_y, -100, 100, 255, 0);
+            }else{
+              $gameScreen.showPicture($.right_man_picture_id, file_name, 0, ori_x, ori_y, -100, 100, 0, 0);
+              $gameScreen.movePicture($.right_man_picture_id, 0, target_x, target_y, -100, 100, 255, 0, $.in_duration);
+            }
 
-            $.The_last_right_man = name;
+            $.Last_right_file_name = file_name;
+            $.Last_right_character_name = character_name;
         }
     }
     
@@ -374,16 +387,16 @@ KURAGE.SimpleTachie = {};
             target_y = $.left_man_adjust_y;
 
             $gameScreen.movePicture($.left_man_picture_id, 0, target_x, target_y, 100, 100, 0, 0, $.out_duration);
-            //$gameScreen.erasePicture($.left_man_picture_id);
-            $.The_last_left_man  = "";
+            $.Last_left_file_name  = "";
+            $.Last_left_character_name = "";
         }
         if(hide_right){
             target_x = $.delta_x + Graphics.width + $.right_man_adjust_x;
             target_y = $.right_man_adjust_y;
 
             $gameScreen.movePicture($.right_man_picture_id, 0, target_x, target_y, -100, 100, 0, 0, $.out_duration);
-            //$gameScreen.erasePicture($.right_man_picture_id);
-            $.The_last_right_man = "";
+            $.Last_right_file_name = "";
+            $.Last_right_character_name = "";
         }
     }
     
